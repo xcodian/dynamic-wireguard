@@ -1,0 +1,17 @@
+[package]
+name = "dynwg-server"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+tokio = { version = "1.18", features = ["full"] }
+
+rand_core = { version = "0.5", default-features = false, features = ["getrandom"] }
+x25519-dalek = "1"
+libaes = "0.6.2"
+sha1 = "0.10.1"
+
+hex = "0.4.3"
+base64 = "0.13.0"
