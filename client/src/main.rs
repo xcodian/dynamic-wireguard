@@ -1,42 +1,48 @@
 use std::error::Error;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
 use rand_core::OsRng;
-use x25519_dalek::{PublicKey, StaticSecret};
+use x25519_dalek::StaticSecret;
 
-pub mod conn_rsp;
+use crate::user_input::verify_key_fingerprint;
+
+pub mod magic;
+pub mod packet;
 pub mod user_input;
-pub mod interface;
-
-use crate::conn_rsp::ConnRsp;
-use crate::interface::create_interface;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn Error>> {
+async fn main() {
     println!("Connecting to remote...");
-    let mut socket = TcpStream::connect("127.0.0.1:8000").await?;
+    let mut socket = TcpStream::connect("127.0.0.1:8000").await.unwrap();
 
-    let private = StaticSecret::new(&mut OsRng);
-    let public = PublicKey::from(&private).to_bytes();
+    let client_private_key = StaticSecret::new(&mut OsRng);
+    // let public = PublicKey::from(&private).to_bytes();
 
-    println!("Obtaining configuration...");
-    let mut buf = Vec::with_capacity(1 + public.len() + 32);
-    buf.extend_from_slice(b"\0");
-    buf.extend_from_slice(&public);
-    buf.extend_from_slice(b"Secret123");
+    println!("[1] -- do keyex with remote...");
+    let res = packet::handshake(&mut socket, &client_private_key).await;
 
-    socket.write_all(buf.as_slice()).await?;
+    if let Err(e) = res {
+        println!("keyex failure: {}", e);
+        return;
+    }
 
-    // allocate 48 bytes
-    let mut buf = [0; 48];
+    let (server_public_key, counter_init) = res.unwrap();
 
-    // read from the socket
-    let size = socket.read(&mut buf).await.expect("could not read");
-    assert_eq!(size, 48);
+    let server_trusted = verify_key_fingerprint(server_public_key.as_bytes());
 
-    let rsp = ConnRsp::decode_and_verify(&buf, &private).await.ok_or("cannot decode")?;
-    create_interface(&rsp, &private).await;
+    if !server_trusted {
+        return;
+    }
 
-    Ok(())
+    let shared_secret = client_private_key.diffie_hellman(&server_public_key);
+
+    println!(
+        "counter: {} secret: {}",
+        counter_init,
+        hex::encode(shared_secret.as_bytes())
+    );
+
+    // do real data sending
+
+    // create_interface(&rsp, &private).await;
 }

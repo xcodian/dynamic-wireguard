@@ -1,12 +1,12 @@
 use std::sync::Arc;
 
-use rand_core::{OsRng, RngCore};
-use tokio::io::AsyncWriteExt;
+use rand_core::OsRng;
+use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
-use tokio::{io::AsyncReadExt, net::TcpStream};
 use x25519_dalek::{PublicKey, StaticSecret};
 
 pub mod conv;
+pub mod magic;
 pub mod packet;
 
 use sha1::{Digest, Sha1};
@@ -58,11 +58,24 @@ async fn main() {
                 // read from the socket
                 let size = conv.socket.read(&mut buf).await.expect("could not read");
 
+                if size == 0 {
+                    // socket shutdown
+                    break;
+                }
+
                 // process the packet
                 let res = packet::process_packet(&mut conv, &mut buf[..size]).await;
 
-                if let None = res {
+                if let Err(e) = res {
                     // terminate connection if process_packet returns None
+                    let id;
+                    if let Some(k) = conv.client_public_key {
+                        id = hex::encode(k.as_bytes());
+                    } else {
+                        id = "???".to_string();
+                    }
+
+                    println!("error[{}]: {}", id, e);
                     break;
                 }
             }

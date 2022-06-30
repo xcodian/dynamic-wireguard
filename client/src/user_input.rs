@@ -3,10 +3,10 @@ use std::io::{stdout, Write};
 use sha1::{Digest, Sha1};
 use colored::*;
 
-pub fn verify_key_fingerprint(key: &[u8]) -> bool {
+pub fn verify_key_fingerprint(public_key: &[u8]) -> bool {
     // compute fingerprint
     let mut hasher = Sha1::new();
-    hasher.update(key);
+    hasher.update(public_key);
 
     let fingerprint = hex::encode_upper(hasher.finalize())
         .chars()
@@ -23,7 +23,7 @@ pub fn verify_key_fingerprint(key: &[u8]) -> bool {
         .collect::<String>();
 
     let randomart = BishopArt::new()
-        .chain(key)
+        .chain(public_key)
         .draw_with_opts(&DrawingOptions {
             top_text: "X25519".to_string(),
             ..Default::default()
@@ -48,9 +48,5 @@ pub fn verify_key_fingerprint(key: &[u8]) -> bool {
     let mut decision = String::new();
     std::io::stdin().read_line(&mut decision).unwrap();
 
-    if decision.to_lowercase() == "y\n" {
-        return true;
-    } else {
-        return false;
-    }
+    return decision.to_lowercase() == "y\n";
 }
