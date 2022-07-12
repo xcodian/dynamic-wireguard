@@ -1,14 +1,11 @@
 use std::sync::Arc;
 
+use rand::rngs::OsRng;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 
-
-use rand_core::OsRng;
 use x25519_dalek::{PublicKey, StaticSecret};
 
-pub mod conv;
-pub mod magic;
 pub mod packet;
 pub mod fingerprint;
 
@@ -38,7 +35,7 @@ async fn main() {
         .await
         .expect("could not bind");
 
-    println!("listening for connections");
+    println!("Listening for connections...");
 
     loop {
         // accept a connection
@@ -49,10 +46,10 @@ async fn main() {
         tokio::spawn(async move {
             let mut buf = [0; 256]; // alloc 256 bytes for incoming data
 
-            let mut conv = conv::Conversation {
+            let mut conv = common::conv::Conversation {
                 socket: _sock,
-                server_private_key: &private_key,
-                client_public_key: None,
+                local_private_key: &private_key,
+                remote_public_key: None,
                 shared_secret: None,
                 counter: None,
             };
@@ -73,7 +70,7 @@ async fn main() {
                 if let Err(e) = res {
                     // terminate connection if process_packet returns None
                     let id;
-                    if let Some(k) = conv.client_public_key {
+                    if let Some(k) = conv.remote_public_key {
                         id = hex::encode(k.as_bytes());
                     } else {
                         id = "???".to_string();

@@ -1,4 +1,3 @@
-use bishop::{BishopArt, DrawingOptions};
 use sha1::{Digest, Sha1};
 use colored::*;
 
@@ -21,17 +20,17 @@ pub fn print_fingerprint(public_key: &[u8]) {
         })
         .collect::<String>();
 
-    let randomart = BishopArt::new()
-        .chain(public_key)
-        .draw_with_opts(&DrawingOptions {
-            top_text: "X25519".to_string(),
-            ..Default::default()
-        })
-        .replace("\n", "\n    ");
+    // let randomart = BishopArt::new()
+    //     .chain(public_key)
+    //     .draw_with_opts(&DrawingOptions {
+    //         top_text: "X25519".to_string(),
+    //         ..Default::default()
+    //     })
+    //     .replace("\n", "\n    ");
 
     println!(
-        "Fingerprint of public key:\n\n    {}\n\nRandomart of public key:\n\n    {}",
-        fingerprint, randomart
+        "Fingerprint of public key:\n\n    {}\n",
+        fingerprint.bold()
     );
 
     println!(

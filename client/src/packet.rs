@@ -4,10 +4,11 @@ use std::io::IoSlice;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-use x25519_dalek::PublicKey;
+use x25519_dalek::{PublicKey, SharedSecret};
 use x25519_dalek::StaticSecret;
 
-use crate::magic;
+use common::conv::Conversation;
+use common::magic;
 
 pub async fn key_exchange(
     socket: &mut TcpStream,
@@ -53,4 +54,12 @@ pub async fn key_exchange(
     let counter_init = u16::from_be_bytes(buf[32..32 + 2].try_into().unwrap());
 
     return Ok((server_public_key, counter_init));
+}
+
+pub async fn obtain_config(
+    socket: &mut TcpStream,
+    secret: &SharedSecret,
+    counter: u16
+) {
+    
 }

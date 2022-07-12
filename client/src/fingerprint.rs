@@ -1,4 +1,3 @@
-use bishop::{BishopArt, DrawingOptions};
 use std::io::{stdout, Write};
 use sha1::{Digest, Sha1};
 use colored::*;

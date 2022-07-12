@@ -1,12 +1,11 @@
+use rand::rngs::OsRng;
 use tokio::net::TcpStream;
 
-use rand_core::OsRng;
 use x25519_dalek::StaticSecret;
 
 use crate::fingerprint::ask_user_to_verify_fingerprint;
 
 pub mod fingerprint;
-pub mod magic;
 pub mod packet;
 
 #[tokio::main]
@@ -35,18 +34,22 @@ async fn main() {
 
     if !ask_user_to_verify_fingerprint(server_public_key.as_bytes()) {
         // server key not trusted
+        println!("Aborting connection.");
         return;
     }
+
+    println!("Obtaining configuration...");
 
     let shared_secret = client_private_key.diffie_hellman(&server_public_key);
 
     println!(
-        "counter: {} secret: {}",
+        "    counter: {} secret: {}",
         counter_init,
         hex::encode(shared_secret.as_bytes())
     );
 
     // do real data sending
+    packet::obtain_config(&mut socket, &shared_secret, counter_init).await;
 
     // create_interface(&rsp, &private).await;
 }
