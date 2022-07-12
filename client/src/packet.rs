@@ -4,11 +4,12 @@ use std::io::IoSlice;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 
-use x25519_dalek::{PublicKey, SharedSecret, StaticSecret};
+use x25519_dalek::PublicKey;
+use x25519_dalek::StaticSecret;
 
 use crate::magic;
 
-pub async fn handshake(
+pub async fn key_exchange(
     socket: &mut TcpStream,
     client_private_key: &StaticSecret,
 ) -> Result<(PublicKey, u16), Box<dyn Error>> {
@@ -30,7 +31,7 @@ pub async fn handshake(
 
     // read from the socket
     let size = socket.read(&mut buf).await.expect("could not read");
-    
+
     // ensure exact size for handshake
     if size != 1 + 32 + 2 {
         Err("invalid handshake response size")?;

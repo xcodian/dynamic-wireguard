@@ -139,7 +139,6 @@ dependencies = [
  "futures",
  "genetlink",
  "hex",
- "libaes",
  "netlink-packet-core",
  "netlink-packet-generic",
  "netlink-packet-wireguard",
@@ -295,12 +294,6 @@ name = "lazy_static"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
-
-[[package]]
-name = "libaes"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "db7c463b5db4448022fb5829e269bf3a0dd0da21ac18e8e03bf2c5a6e53cc2b8"
 
 [[package]]
 name = "libc"

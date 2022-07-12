@@ -1,15 +1,18 @@
 use std::sync::Arc;
 
-use rand_core::OsRng;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
+
+
+use rand_core::OsRng;
 use x25519_dalek::{PublicKey, StaticSecret};
 
 pub mod conv;
 pub mod magic;
 pub mod packet;
+pub mod fingerprint;
 
-use sha1::{Digest, Sha1};
+use crate::fingerprint::print_fingerprint;
 
 #[tokio::main]
 async fn main() {
@@ -28,10 +31,10 @@ async fn main() {
     let private_key = Arc::new(private_key);
 
     // show the key fingerprint as server
-    print_key_fingerprint(&PublicKey::from(private_key.as_ref()).to_bytes());
+    print_fingerprint(&PublicKey::from(private_key.as_ref()).to_bytes());
 
     // bind a tcp listener
-    let listener = TcpListener::bind(format!("127.0.0.1:{}", 8000))
+    let listener = TcpListener::bind("127.0.0.1:8000")
         .await
         .expect("could not bind");
 
@@ -39,7 +42,7 @@ async fn main() {
 
     loop {
         // accept a connection
-        let (socket, _) = listener.accept().await.unwrap();
+        let (_sock, _) = listener.accept().await.unwrap();
         // increment arc ref count
         let private_key = private_key.clone();
 
@@ -47,7 +50,7 @@ async fn main() {
             let mut buf = [0; 256]; // alloc 256 bytes for incoming data
 
             let mut conv = conv::Conversation {
-                socket: socket,
+                socket: _sock,
                 server_private_key: &private_key,
                 client_public_key: None,
                 shared_secret: None,
@@ -60,6 +63,7 @@ async fn main() {
 
                 if size == 0 {
                     // socket shutdown
+                    println!("remote closed connection");
                     break;
                 }
 
@@ -81,14 +85,4 @@ async fn main() {
             }
         });
     }
-}
-
-fn print_key_fingerprint(key: &[u8]) {
-    // compute fingerprint
-    let mut hasher = Sha1::new();
-    hasher.update(key);
-
-    let fingerprint = hasher.finalize();
-    println!("public key:\n    {}", hex::encode(key));
-    println!("public key fingerprint:\n    {}", hex::encode(fingerprint));
 }

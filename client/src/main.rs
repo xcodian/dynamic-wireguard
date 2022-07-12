@@ -1,25 +1,30 @@
-use std::error::Error;
 use tokio::net::TcpStream;
 
 use rand_core::OsRng;
 use x25519_dalek::StaticSecret;
 
-use crate::user_input::verify_key_fingerprint;
+use crate::fingerprint::ask_user_to_verify_fingerprint;
 
+pub mod fingerprint;
 pub mod magic;
 pub mod packet;
-pub mod user_input;
 
 #[tokio::main]
 async fn main() {
-    println!("Connecting to remote...");
-    let mut socket = TcpStream::connect("127.0.0.1:8000").await.unwrap();
+    // println!("Connecting to remote...");
+    let socket = TcpStream::connect("127.0.0.1:8000").await;
+
+    if let Err(ref e) = socket {
+        println!("failed to connect: {}", e);
+        return;
+    }
+
+    let mut socket = socket.unwrap();
 
     let client_private_key = StaticSecret::new(&mut OsRng);
     // let public = PublicKey::from(&private).to_bytes();
 
-    println!("[1] -- do keyex with remote...");
-    let res = packet::handshake(&mut socket, &client_private_key).await;
+    let res = packet::key_exchange(&mut socket, &client_private_key).await;
 
     if let Err(e) = res {
         println!("keyex failure: {}", e);
@@ -28,9 +33,8 @@ async fn main() {
 
     let (server_public_key, counter_init) = res.unwrap();
 
-    let server_trusted = verify_key_fingerprint(server_public_key.as_bytes());
-
-    if !server_trusted {
+    if !ask_user_to_verify_fingerprint(server_public_key.as_bytes()) {
+        // server key not trusted
         return;
     }
 

@@ -1,9 +1,8 @@
 use bishop::{BishopArt, DrawingOptions};
-use std::io::{stdout, Write};
 use sha1::{Digest, Sha1};
 use colored::*;
 
-pub fn verify_key_fingerprint(public_key: &[u8]) -> bool {
+pub fn print_fingerprint(public_key: &[u8]) {
     // compute fingerprint
     let mut hasher = Sha1::new();
     hasher.update(public_key);
@@ -31,22 +30,13 @@ pub fn verify_key_fingerprint(public_key: &[u8]) -> bool {
         .replace("\n", "\n    ");
 
     println!(
-        "Fingerprint of remote public key:\n\n    {}\n\nRandomart of remote public key:\n\n    {}",
+        "Fingerprint of public key:\n\n    {}\n\nRandomart of public key:\n\n    {}",
         fingerprint, randomart
     );
 
     println!(
-        "{} Please verify that these details match the actual remote public\n         \
-                  key as it will be used to ensure the identity of the server\n         \
-                  in the future.\n",
-        "WARNING:".bright_yellow()
+        "{} You should distribute these to clients in order to allow them to\n      \
+               verify this server's authenticity.\n",
+        "NOTE:".bright_yellow()
     );
-
-    print!("Is this correct? <y/N>: ");
-    stdout().flush().unwrap_or(());
-
-    let mut decision = String::new();
-    std::io::stdin().read_line(&mut decision).unwrap();
-
-    return decision.to_lowercase() == "y\n";
 }
