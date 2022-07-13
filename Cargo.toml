@@ -1,6 +1,34 @@
-[workspace]
-members = [
-    "common",
-    "server",
-    "client",
-]
+[package]
+name = "dynamic-wireguard"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.18", features = ["full"] }
+futures = "0.3.21"
+
+# random number generation
+rand = "0.7.0"
+# symmetric encryption
+chacha20poly1305 = "0.9.1"
+# asymmetric encryption
+x25519-dalek = "1.2.0"
+# key fingerprinting
+sha1 = "0.10.1"
+
+hex = "0.4.3"
+colored = "2.0.0"
+
+# netlink stuff
+genetlink = "0.2.3"
+rtnetlink = "0.10.1"
+netlink-packet-core = "0.4.2"
+netlink-packet-generic = "0.3.1"
+netlink-packet-wireguard = "0.2.1"
+
+[profile.release]
+opt-level = 'z'     # Optimize for size.
+lto = true          # Enable Link Time Optimization
+codegen-units = 1   # Reduce number of codegen units to increase optimizations.
+panic = 'abort'     # Abort on panic
+# strip = true        # Strip symbols from binary*

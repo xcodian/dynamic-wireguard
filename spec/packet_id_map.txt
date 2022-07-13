@@ -1,0 +1,11 @@
+The first two packets in a conversation are ALWAYS keyex_req and keyex_resp.
+
+After this, the communication is encrypted, and any encrypted data has its first byte equal to a packet id.
+
+Packet ID's:
+    0x01 (1) [C>S] - Get Configuration 
+        {
+            1B  length of `user_id` = X
+            XB  user_id
+            32B authorization
+        }

@@ -8,4 +8,5 @@ pub struct Conversation<'a> {
     pub remote_public_key: Option<PublicKey>,
     pub shared_secret: Option<SharedSecret>,
     pub counter: Option<u16>,
+    pub auth_method: Option<u8>,
 }

@@ -113,25 +113,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "common"
-version = "0.1.0"
-dependencies = [
- "chacha20poly1305",
- "colored",
- "futures",
- "genetlink",
- "hex",
- "netlink-packet-core",
- "netlink-packet-generic",
- "netlink-packet-wireguard",
- "rand",
- "rtnetlink",
- "sha1",
- "tokio",
- "x25519-dalek",
-]
-
-[[package]]
 name = "cpufeatures"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -183,32 +164,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "dynwg-client"
+name = "dynamic-wireguard"
 version = "0.1.0"
 dependencies = [
  "chacha20poly1305",
  "colored",
- "common",
- "futures",
- "genetlink",
- "hex",
- "netlink-packet-core",
- "netlink-packet-generic",
- "netlink-packet-wireguard",
- "rand",
- "rtnetlink",
- "sha1",
- "tokio",
- "x25519-dalek",
-]
-
-[[package]]
-name = "dynwg-server"
-version = "0.1.0"
-dependencies = [
- "chacha20poly1305",
- "colored",
- "common",
  "futures",
  "genetlink",
  "hex",
