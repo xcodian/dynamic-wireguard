@@ -9,11 +9,11 @@ tokio = { version = "1.18", features = ["full"] }
 futures = "0.3.21"
 
 # random number generation
-rand = "0.7.0"
+rand = "0.7.0" # must be 0.7 because of x25519-dalek
 
 # symmetric encryption
 chacha20poly1305 = "0.9.1"
-# asymmetric encryption
+# diffie-hellman
 x25519-dalek = "1.2.0"
 
 # key fingerprinting
@@ -28,6 +28,8 @@ rpassword = "6.0.1"
 
 # colored output
 colored = "2.0.0"
+# logging
+log = "0.4.17"
 
 # netlink stuff (interface configuration)
 genetlink = "0.2.3"

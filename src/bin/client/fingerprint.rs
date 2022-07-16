@@ -1,4 +1,5 @@
 use colored::*;
+use log::{info, warn};
 use sha1::{Digest, Sha1};
 use std::{
     fs::OpenOptions,
@@ -40,7 +41,7 @@ pub fn verify_fingerprint(hostname: &str, public_key: &[u8]) -> bool {
         SavedState::NotSaved => {}
     };
 
-    println!(
+    warn!(
         "The authenticity of host '{}' can't be established.\nFingerprint of remote public key:\n\n    {}\n",
         hostname, human_readable_hex(&fingerprint).bold()
     );
@@ -86,17 +87,13 @@ fn validate_saved(hostname: &str, fingerprint: &str) -> SavedState {
             let parts: Vec<&str> = line.split(' ').collect();
 
             if parts.len() != 2 || hex::decode(parts[1]).is_err() || parts[1].len() != 40 {
-                println!(
-                    "{} wgd_known_hosts: line {} is invalid",
-                    "warn:".bright_yellow().bold(),
-                    n
-                );
+                warn!("wgd_known_hosts: line {} is invalid", n);
                 continue;
             }
 
             if hostname == parts[0] {
                 if fingerprint == parts[1] {
-                    println!("Remote identity verified (wgd_known_hosts:{})", n);
+                    info!("Remote identity verified (wgd_known_hosts:{})", n);
                     return SavedState::Match;
                 } else {
                     println!(
@@ -150,8 +147,8 @@ fn save_fingerprint(hostname: &str, fingerprint: &str) {
             IoSlice::new(fingerprint.as_bytes()),
             IoSlice::new(b"\n"),
         ]) {
-            println!(
-                "Warning: Permanently added '{}' to the list of known hosts.",
+            warn!(
+                "Permanently added '{}' to the list of known hosts.",
                 hostname
             );
         }

@@ -8,6 +8,7 @@ use dynamic_wireguard::conv::Conversation;
 use dynamic_wireguard::wgconfig::WgAddrConfig;
 use dynamic_wireguard::{crypto, magic};
 
+use log::{debug, warn, info};
 use rand::rngs::OsRng;
 use rand::RngCore;
 use tokio::io::AsyncWriteExt;
@@ -24,32 +25,24 @@ pub async fn process_packet(
 ) -> Result<(), Box<dyn Error>> {
     let magic = *msg.get(0).ok_or("no header to parse")?;
 
-    let is_encrypted = magic::parse(magic).ok_or("invalid magic")?;
+    let is_encrypted = magic::parse(magic).ok_or("header: invalid magic")?;
 
     let encrypted = &mut msg[1..]; // strip 1 byte magic
 
     if !is_encrypted {
         // this packet must be a key + counter request (handshake)
-        return keyex_reply(conv, encrypted).await;
-    }
+        let res = keyex_reply(conv, encrypted).await;
 
-    println!(
-        "encrypted data ({} bytes): {}",
-        encrypted.len(),
-        hex::encode(&encrypted)
-    );
+        return match res {
+            Ok(_) => Ok(()),
+            Err(e) => Err("keyex: ".to_string() + e.to_string().as_str())?,
+        };
+    }
 
     // this packet must be encrypted
     let decrypted = crypto::decrypt_payload(conv, encrypted)?;
 
-    println!(
-        "decrypted data ({} bytes): {}",
-        decrypted.len(),
-        hex::encode(&decrypted)
-    );
-
     let packet_id = decrypted[0];
-    println!("packet id: {}", packet_id);
 
     {
         // strip packet id
@@ -61,14 +54,14 @@ pub async fn process_packet(
         match packet_id {
             // config request
             1 => {
-                println!("client requested config");
+                info!("client requested config");
                 let remote_config = config_reply(conv, msg).await?;
 
                 // make local interface
                 add_peer_to_interface(&conf, remote_config.assigned_address, &conv.remote_public_key.unwrap()).await?;
             }
             _ => {
-                println!("unknown packet id: {}", packet_id)
+                warn!("unknown packet id: {}", packet_id)
             }
         }
     }
@@ -108,7 +101,8 @@ pub async fn keyex_reply(conv: &mut Conversation<'_>, msg: &mut [u8]) -> Result<
     conv.auth_method = Some(AuthMethod::UsernamePassword);
 
     // send public key & counter initializer to the client
-    let size = conv.socket
+    info!("keyex: sending handshake reply");
+    conv.socket
         .write_vectored(&[
             IoSlice::new(&[magic::make(false)]),
             IoSlice::new(server_public_key.as_bytes()),
@@ -116,8 +110,6 @@ pub async fn keyex_reply(conv: &mut Conversation<'_>, msg: &mut [u8]) -> Result<
             IoSlice::new(&[conv.auth_method.unwrap().to_u8()]),
         ])
         .await?;
-
-    println!("keyex reply: sent {} bytes", size);
 
     return Ok(());
 }

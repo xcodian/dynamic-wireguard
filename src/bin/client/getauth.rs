@@ -40,8 +40,6 @@ fn get_username_password() -> Result<String, Box<dyn Error>> {
     secret.push_str(":");
     secret.push_str(rpassword::prompt_password("Password: ")?.as_str());
 
-    println!("{}", secret);
-
     return Ok(hash_hash(secret.as_bytes()));
 }
 

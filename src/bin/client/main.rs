@@ -1,5 +1,5 @@
-use colored::Colorize;
-use dynamic_wireguard::conv;
+use dynamic_wireguard::{conv, logger};
+use log::{debug, error, info};
 use rand::rngs::OsRng;
 use tokio::net::TcpStream;
 
@@ -14,7 +14,9 @@ pub mod net;
 
 #[tokio::main]
 async fn main() {
-    // println!("Connecting to remote...");
+    logger::init().unwrap();
+
+    debug!("connecting...");
     let target = std::env::args()
         .nth(1)
         .unwrap_or_else(|| "127.0.0.1:8000".to_string());
@@ -22,7 +24,7 @@ async fn main() {
     let socket = TcpStream::connect(target).await;
 
     if let Err(ref e) = socket {
-        println!("{} failed to connect: {}", "error:".bright_red().bold(), e);
+        error!("failed to connect: {}", e);
         return;
     }
 
@@ -48,7 +50,7 @@ async fn main() {
     let res = net::key_exchange(&mut conv).await;
 
     if let Err(e) = res {
-        println!("{} {}", "error:".bright_red().bold(), e);
+        error!("{}", e);
         return;
     }
 
@@ -57,14 +59,14 @@ async fn main() {
         conv.remote_public_key.unwrap().as_bytes(),
     ) {
         // server key not trusted
-        println!("Aborting connection.");
+        error!("Remote identity cannot be trusted, aborting.");
         return;
     }
 
     let credential = getauth::get_auth(&conv.auth_method.unwrap());
 
     if let Err(e) = credential {
-        println!("{} {}", "error:".bright_red().bold(), e);
+        error!("{}", e);
         return;
     }
 
@@ -74,7 +76,7 @@ async fn main() {
     let config = net::obtain_config(&mut conv, credential.as_slice()).await;
 
     if let Err(e) = config {
-        println!("{} {}", "error:".bright_red().bold(), e);
+        error!("{}", e);
         return;
     }
 

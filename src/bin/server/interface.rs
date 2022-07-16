@@ -1,8 +1,9 @@
 use std::error::Error;
 use std::net::{IpAddr, Ipv4Addr};
 
-use colored::Colorize;
 
+
+use log::{debug, info};
 use netlink_packet_wireguard::nlas::{
     WgAllowedIp, WgAllowedIpAttrs, WgDeviceAttrs, WgPeer, WgPeerAttrs,
 };
@@ -54,10 +55,7 @@ pub async fn create_server_interface(conf: &ServerConfig) -> Result<(), Box<dyn 
     add_req_msg.header.flags = rtnetlink::packet::IFF_UP;
     add_req_msg.header.change_mask = rtnetlink::packet::IFF_UP;
 
-    println!(
-        "Creating wireguard interface {}...",
-        conf.if_name.bright_green()
-    );
+    info!("Creating wireguard interface {}...", conf.if_name);
     // send rtnetlink message to kernel
     if let Err(e) = add_req.execute().await {
         Err(format!("failed to create interface: {}", e.to_string()))?;
@@ -65,7 +63,7 @@ pub async fn create_server_interface(conf: &ServerConfig) -> Result<(), Box<dyn 
 
     // open netlink connection with wireguard
     let mut nl_handle = connect_to_genetlink().await?;
-    
+
     // generate "set device" request
     let genl_msg: GenlMessage<Wireguard> = GenlMessage::from_payload(Wireguard {
         cmd: WireguardCmd::SetDevice,
@@ -82,7 +80,7 @@ pub async fn create_server_interface(conf: &ServerConfig) -> Result<(), Box<dyn 
     let mut nl_msg = NetlinkMessage::from(genl_msg);
     nl_msg.header.flags = NLM_F_REQUEST;
 
-    // println!("    configuring interface...");
+    debug!("configuring interface...");
     if let Err(e) = nl_handle.notify(nl_msg).await {
         Err(format!("failed to set configuration: {}", e.to_string()))?;
     }
@@ -100,7 +98,7 @@ pub async fn create_server_interface(conf: &ServerConfig) -> Result<(), Box<dyn 
         let link = get_res.unwrap();
 
         // 3. add its address
-        // println!("    address {}/{}", conf.gateway, conf.cidr);
+        debug!("assign address: {}/{}", conf.gateway, conf.cidr);
         let addr_add_res = rt_handle
             .address()
             .add(link.header.index, IpAddr::V4(conf.gateway), conf.cidr)
@@ -112,7 +110,7 @@ pub async fn create_server_interface(conf: &ServerConfig) -> Result<(), Box<dyn 
         }
 
         // 4. set device mtu
-        // println!("    mtu {}", 1420u16.to_string().bright_green());
+        debug!("assign mtu: {}", 1420u16.to_string());
         let mtu_res = rt_handle
             .link()
             .set(link.header.index)
@@ -153,9 +151,13 @@ pub async fn delete_interface(name: String) -> Result<(), Box<dyn Error>> {
     return Ok(rt_handle.link().del(index).execute().await?);
 }
 
-pub async fn add_peer_to_interface(conf: &ServerConfig, ip: Ipv4Addr, remote_public: &PublicKey) -> Result<(), Box<dyn Error>> {
+pub async fn add_peer_to_interface(
+    conf: &ServerConfig,
+    ip: Ipv4Addr,
+    remote_public: &PublicKey,
+) -> Result<(), Box<dyn Error>> {
     let mut nl_handle = connect_to_genetlink().await?;
-    
+
     // generate "set device" request
     let genl_msg: GenlMessage<Wireguard> = GenlMessage::from_payload(Wireguard {
         cmd: WireguardCmd::SetDevice,
@@ -178,6 +180,8 @@ pub async fn add_peer_to_interface(conf: &ServerConfig, ip: Ipv4Addr, remote_pub
     let mut nl_msg = NetlinkMessage::from(genl_msg);
     nl_msg.header.flags = NLM_F_REQUEST;
     nl_handle.notify(nl_msg).await?;
+
+    info!("added peer to interface: assigned {}", ip);
 
     return Ok(());
 }

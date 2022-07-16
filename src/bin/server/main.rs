@@ -2,8 +2,7 @@ use std::net::Ipv4Addr;
 use std::str::FromStr;
 use std::sync::Arc;
 
-use colored::Colorize;
-use dynamic_wireguard::conv;
+use dynamic_wireguard::{conv, logger};
 
 use futures::{select, FutureExt};
 use interface::delete_interface;
@@ -24,8 +23,12 @@ use crate::config::ServerConfig;
 use crate::fingerprint::print_fingerprint;
 use crate::interface::create_server_interface;
 
+use log::{info, error, debug};
+
 #[tokio::main]
 async fn main() {
+    logger::init().unwrap();
+
     // generate private key
     let private_key = StaticSecret::new(&mut OsRng);
 
@@ -40,19 +43,21 @@ async fn main() {
     });
 
     if let Err(e) = create_server_interface(&conf).await {
-        println!("{} {}", "error:".bright_red().bold(), e);
-        return;
+        return error!("{}", e);
     };
 
     // show the key fingerprint as server
     print_fingerprint(&conf.public_key.to_bytes());
 
     // bind a tcp listener
-    let listener = TcpListener::bind("0.0.0.0:8000")
-        .await
-        .expect("could not bind");
+    let listener = match TcpListener::bind("0.0.0.0:8000").await {
+        Ok(listener) => listener,
+        Err(e) => {
+            return error!("{}", e);
+        }
+    };
 
-    println!("Listening for connections...");
+    info!("listening for connections...");
 
     loop {
         // wait for either to happen
@@ -65,7 +70,7 @@ async fn main() {
             // there is a new connection
             try_accept = listener.accept().fuse() => {
                 let (_sock, _) = try_accept.unwrap();
-                println!("+connection");
+                info!("connection opened: {}", _sock.peer_addr().unwrap());
 
                 // increment arc ref count
                 let conf = conf.clone();
@@ -100,13 +105,15 @@ async fn main() {
                             if let Some(k) = conv.remote_public_key {
                                 id = hex::encode(k.as_bytes())[..8].to_string();
                             } else {
-                                id = "unknown?".to_string();
+                                id = "unidentified".to_string();
                             }
 
-                            println!("error[{}]: {}", id, e);
+                            error!("[{}]: {}", id, e);
                             break;
                         }
                     }
+
+                    info!("connection closed: {}", match conv.socket.peer_addr() { Ok(addr) => addr.to_string(), Err(_) => "no address (disconnected)".to_string() });
                 };
 
                 tokio::spawn(new_conversation);
@@ -114,8 +121,8 @@ async fn main() {
         }
     }
 
-    println!("Cleaning up...");
+    info!("Cleaning up...");
     if let Err(e) = delete_interface(conf.if_name.clone()).await {
-        println!("{} failed to delete interface: {}", "warn(cleanup):".bright_yellow().bold(), e);
+        error!("cleanup: failed to delete interface: {}", e);
     };
 }

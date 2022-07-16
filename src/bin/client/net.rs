@@ -91,8 +91,8 @@ pub async fn obtain_config(conv: &mut Conversation<'_>, auth: &[u8]) -> Result<W
     // allocate a buffer for responses
     let mut buf = [0; 64]; // shouldn't be bigger really idk :/
     
-    // wait for the response (1s)
-    let result = timeout(Duration::from_secs(1), conv.socket.read(&mut buf)).await;
+    // wait for the response (5s)
+    let result = timeout(Duration::from_secs(5), conv.socket.read(&mut buf)).await;
 
     if let Err(_) = result {
         Err("Timed out waiting for response from remote")?;
@@ -113,7 +113,6 @@ pub async fn obtain_config(conv: &mut Conversation<'_>, auth: &[u8]) -> Result<W
     let buf = &mut buf[1..]; // strip magic
 
     let decrypted = crypto::decrypt_payload(conv, buf)?;
-    // println!("received {} byte config response: {}", decrypted.len(), hex::encode(&decrypted));
 
     // parse out into a config object
     let config = WgAddrConfig::deserialize(decrypted)?;

@@ -1,9 +1,10 @@
-use std::net::{IpAddr, SocketAddr, Ipv4Addr};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use colored::Colorize;
+
 
 use dynamic_wireguard::wgconfig::WgAddrConfig;
 
+use log::{debug, error, info};
 use netlink_packet_wireguard::nlas::{
     WgAllowedIp, WgAllowedIpAttrs, WgDeviceAttrs, WgPeer, WgPeerAttrs,
 };
@@ -23,7 +24,7 @@ pub async fn create_interface(
     config: &WgAddrConfig,
     local_private: &StaticSecret,
     remote_public: &PublicKey,
-    remote_addr: Ipv4Addr
+    remote_addr: Ipv4Addr,
 ) {
     // let if_name = "wgdyn0".to_string();
 
@@ -31,11 +32,7 @@ pub async fn create_interface(
     let rt_maybe = rtnetlink::new_connection();
 
     if let Err(e) = rt_maybe {
-        println!(
-            "{} Failed to open RTNETLINK connection: {}",
-            "error:".bright_red(),
-            e.to_string()
-        );
+        error!("Failed to open RTNETLINK connection: {}", e.to_string());
         return;
     }
 
@@ -79,15 +76,10 @@ pub async fn create_interface(
     add_req_msg.header.flags = rtnetlink::packet::IFF_UP;
     add_req_msg.header.change_mask = rtnetlink::packet::IFF_UP;
 
-    println!("Creating WireGuard interface {}...", if_name.bright_green());
+    info!("Creating WireGuard interface {}...", if_name);
     // send rtnetlink message to kernel
     if let Err(e) = add_req.execute().await {
-        println!(
-            "{} Failed to create {}: {}",
-            "error:".bright_red().bold(),
-            if_name,
-            e.to_string()
-        );
+        error!("Failed to create {}: {}", if_name, e.to_string());
         return;
     };
 
@@ -95,11 +87,7 @@ pub async fn create_interface(
     let nl_maybe = genetlink::new_connection();
 
     if let Err(e) = nl_maybe {
-        println!(
-            "{} Failed to open WG NETLINK connection: {}",
-            "error:".bright_red().bold(),
-            e.to_string()
-        );
+        error!("Failed to open WG NETLINK connection: {}", e.to_string());
         return;
     }
 
@@ -130,13 +118,9 @@ pub async fn create_interface(
     let mut nl_msg = NetlinkMessage::from(genl_msg);
     nl_msg.header.flags = NLM_F_REQUEST;
 
-    println!("    Setting configuration...");
+    debug!("configuring interface...");
     if let Err(e) = nl_handle.notify(nl_msg).await {
-        println!(
-            "{} Failed to set WireGuard configuration: {}",
-            "error:".bright_red().bold(),
-            e.to_string()
-        );
+        error!("Failed to set WireGuard configuration: {}", e.to_string());
         return;
     }
 
@@ -149,9 +133,9 @@ pub async fn create_interface(
         let link = get_res.unwrap();
 
         // 3. add its address
-        println!(
-            "    Assigning address {}...",
-            (config.assigned_address.to_string() + "/24").bright_green()
+        debug!(
+            "assigning address {}...",
+            config.assigned_address.to_string() + "/24"
         );
         let addr_add_res = rt_handle
             .address()
@@ -160,19 +144,12 @@ pub async fn create_interface(
             .await;
 
         if let Err(e) = addr_add_res {
-            println!(
-                "{} Failed to add address: {}",
-                "error:".bright_red().bold(),
-                e.to_string()
-            );
+            error!("Failed to assign address: {}", e.to_string());
             return;
         }
 
         // 4. set device mtu
-        println!(
-            "    Setting MTU to {}...",
-            1420u16.to_string().bright_green()
-        );
+        debug!("assign mtu: {}", 1420u16.to_string());
         let mtu_res = rt_handle
             .link()
             .set(link.header.index)
@@ -181,18 +158,11 @@ pub async fn create_interface(
             .await;
 
         if let Err(e) = mtu_res {
-            println!(
-                "{} Failed to set MTU: {}",
-                "error:".bright_red().bold(),
-                e.to_string()
-            );
+            error!("Failed to set MTU: {}", e.to_string());
             return;
         }
     } else {
-        println!(
-            "{} Failed to set interface address: interface disappeared while configuring",
-            "error:".bright_red().bold()
-        );
+        error!("Failed to set interface address: interface disappeared while configuring");
         return;
     }
 }

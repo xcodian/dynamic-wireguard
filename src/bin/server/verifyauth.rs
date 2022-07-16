@@ -1,7 +1,6 @@
 use dynamic_wireguard::{conv::Conversation, auth::AuthMethod, crypto::hash_verify};
 
 pub fn verify(attempt: &[u8], conv: &Conversation) -> bool {
-    println!("START VERITY");
     let method = conv.auth_method.unwrap();
 
     let verdict = match method {
@@ -24,7 +23,7 @@ pub fn verify(attempt: &[u8], conv: &Conversation) -> bool {
         },
     };
 
-    println!("VERIFY DONE");
+
     return verdict;
 }
 
