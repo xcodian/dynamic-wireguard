@@ -3,6 +3,7 @@ use std::io::IoSlice;
 use std::net::Ipv4Addr;
 use std::str::FromStr;
 
+use dynamic_wireguard::auth::AuthMethod;
 use dynamic_wireguard::conv::Conversation;
 use dynamic_wireguard::wgconfig::WgAddrConfig;
 use dynamic_wireguard::{crypto, magic};
@@ -12,8 +13,13 @@ use rand::RngCore;
 use tokio::io::AsyncWriteExt;
 use x25519_dalek::PublicKey;
 
+use crate::config::ServerConfig;
+use crate::interface::add_peer_to_interface;
+use crate::verifyauth::verify;
+
 pub async fn process_packet(
     conv: &mut Conversation<'_>,
+    conf: &ServerConfig,
     msg: &mut [u8],
 ) -> Result<(), Box<dyn Error>> {
     let magic = *msg.get(0).ok_or("no header to parse")?;
@@ -56,7 +62,10 @@ pub async fn process_packet(
             // config request
             1 => {
                 println!("client requested config");
-                config_reply(conv, msg).await?;
+                let remote_config = config_reply(conv, msg).await?;
+
+                // make local interface
+                add_peer_to_interface(&conf, remote_config.assigned_address, &conv.remote_public_key.unwrap()).await?;
             }
             _ => {
                 println!("unknown packet id: {}", packet_id)
@@ -96,7 +105,7 @@ pub async fn keyex_reply(conv: &mut Conversation<'_>, msg: &mut [u8]) -> Result<
     // compute public key
     let server_public_key = PublicKey::from(conv.local_private_key);
 
-    conv.auth_method = Some(0x01u8); // auth method: password
+    conv.auth_method = Some(AuthMethod::UsernamePassword);
 
     // send public key & counter initializer to the client
     let size = conv.socket
@@ -104,7 +113,7 @@ pub async fn keyex_reply(conv: &mut Conversation<'_>, msg: &mut [u8]) -> Result<
             IoSlice::new(&[magic::make(false)]),
             IoSlice::new(server_public_key.as_bytes()),
             IoSlice::new(&counter_init.to_be_bytes()),
-            IoSlice::new(&[conv.auth_method.unwrap()]),
+            IoSlice::new(&[conv.auth_method.unwrap().to_u8()]),
         ])
         .await?;
 
@@ -113,26 +122,21 @@ pub async fn keyex_reply(conv: &mut Conversation<'_>, msg: &mut [u8]) -> Result<
     return Ok(());
 }
 
-pub async fn config_reply(conv: &mut Conversation<'_>, msg: &[u8]) -> Result<(), Box<dyn Error>> {
-    // TODO: verify authentication properly!
-    // assert_eq!(msg, b"SomeHashedToken123");
-    // println!("    authorization: {}", std::str::from_utf8(msg).unwrap());
-    if msg != b"SomeHashedToken123" {
-        Err("invalid credentials, denying connection")?;
+pub async fn config_reply(conv: &mut Conversation<'_>, msg: &[u8]) -> Result<WgAddrConfig, Box<dyn Error>> {
+    // verify authentication method
+    if !verify(msg, conv) {
+        Err(format!("authentication failed ({})", conv.auth_method.unwrap().name()))?;
     }
 
     // make config
     let config = WgAddrConfig {
-        wg_endpoint_host: Ipv4Addr::from_str("123.45.67.89").unwrap(),
         wg_endpoint_port: 4000u16,
         internal_gateway: Ipv4Addr::from_str("10.8.0.1").unwrap(),
         assigned_address: Ipv4Addr::from_str("10.8.0.69").unwrap(),
-    }
-    // pack into bytes
-    .serialize();
+    };
 
-    // encrypt
-    let data = crypto::encrypt_payload(conv, &config)?;
+    // pack into bytes & encrypt
+    let data = crypto::encrypt_payload(conv, &config.serialize())?;
 
     // send
     conv.socket
@@ -142,5 +146,5 @@ pub async fn config_reply(conv: &mut Conversation<'_>, msg: &[u8]) -> Result<(),
         ])
         .await?;
 
-    return Ok(());
+    return Ok(config);
 }

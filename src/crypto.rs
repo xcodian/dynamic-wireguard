@@ -6,6 +6,20 @@ use rand::RngCore;
 
 use crate::conv::Conversation;
 
+use argon2;
+
+static ARGON2_CONFIG: argon2::Config = argon2::Config {
+    variant: argon2::Variant::Argon2id,
+    version: argon2::Version::Version13,
+    mem_cost: 4096,
+    time_cost: 10,
+    lanes: 1,
+    thread_mode: argon2::ThreadMode::Sequential,
+    secret: &[],
+    ad: &[],
+    hash_length: 32
+};
+
 pub fn symmetric_decrypt(encrypted: &[u8], nonce: &[u8; 12], key: &[u8; 32]) -> Result<Vec<u8>, Box<dyn Error>> {
     let key = Key::from_slice(key); // 32-bytes key
     let nonce = Nonce::from_slice(nonce); // 12-bytes; unique per message
@@ -31,7 +45,7 @@ pub fn symmetric_encrypt(plain: &[u8], nonce: &[u8; 12], key: &[u8; 32]) -> Resu
     return Ok(encrypted);
 }
 
-pub fn generate_nonce() -> [u8; 12] {
+pub fn generate_12b_nonce() -> [u8; 12] {
     // generate a random nonce
     let mut nonce = [0u8; 12];
     rand::thread_rng().fill_bytes(&mut nonce);
@@ -113,7 +127,7 @@ pub fn encrypt_payload<'a>(
     conv.counter = Some(conv.counter.unwrap().wrapping_add(1));
 
     // make a nonce
-    let nonce = generate_nonce();
+    let nonce = generate_12b_nonce();
 
     // encrypt the (counter+plaintext)
     let mut body = symmetric_encrypt(
@@ -125,4 +139,15 @@ pub fn encrypt_payload<'a>(
     body.extend_from_slice(nonce.as_slice());
 
     return Ok(body); // chacha20poly1305(counter + message) + nonce
+}
+
+pub fn hash_hash(plaintext: &[u8]) -> String {
+    let salt = generate_12b_nonce();
+
+    let hashed = argon2::hash_encoded(plaintext, &salt, &ARGON2_CONFIG).unwrap();
+    return hashed;
+}
+
+pub fn hash_verify(plaintext: &[u8], hash: &str) -> bool {
+    return argon2::verify_encoded(hash, plaintext).unwrap();
 }

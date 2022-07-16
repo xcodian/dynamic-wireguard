@@ -3,6 +3,7 @@ use std::io::IoSlice;
 use std::time::Duration;
 
 use colored::Colorize;
+use dynamic_wireguard::auth::AuthMethod;
 use dynamic_wireguard::wgconfig::WgAddrConfig;
 use dynamic_wireguard::{conv::Conversation, crypto};
 use dynamic_wireguard::magic;
@@ -33,18 +34,18 @@ pub async fn key_exchange(conv: &mut Conversation<'_>) -> Result<(), Box<dyn Err
     let mut buf = [0; 1 + 32 + 2 + 1];
 
     // read from the socket
-    let size = conv.socket.read(&mut buf).await.expect("could not read");
+    let size = conv.socket.read(&mut buf).await.expect("Could not read on socket");
 
     // ensure exact size for handshake
     if size != 1 + 32 + 2 + 1 {
-        Err("invalid handshake response size")?;
+        Err("Invalid handshake response size")?;
     }
 
     let is_encrypted = magic::parse(buf[0]).ok_or("invalid magic")?;
 
     if is_encrypted {
         // should not be encrypted yet
-        Err("handshake marked as encrypted")?;
+        Err("Handshake marked as encrypted")?;
     }
 
     // strip header
@@ -56,24 +57,22 @@ pub async fn key_exchange(conv: &mut Conversation<'_>) -> Result<(), Box<dyn Err
         PublicKey::from(server_public_key)
     );
 
+    conv.shared_secret = Some(
+        conv.local_private_key.diffie_hellman(&conv.remote_public_key.unwrap())
+    );
+
     conv.counter = Some(
         u16::from_be_bytes(buf[32..32 + 2].try_into().unwrap())
     );
 
     conv.auth_method = Some(
-        buf[32 + 2]
+        AuthMethod::from_u8(buf[32 + 2])?
     );
 
     return Ok(());
 }
 
-pub async fn obtain_config(conv: &mut Conversation<'_>) -> Result<WgAddrConfig, Box<dyn Error>> {
-    if conv.auth_method.unwrap() != 0x01 {
-        Err(format!("unsupported auth method: {}", conv.auth_method.unwrap()))?;
-    }
-
-    let auth = b"SomeHashedToken123";
-
+pub async fn obtain_config(conv: &mut Conversation<'_>, auth: &[u8]) -> Result<WgAddrConfig, Box<dyn Error>> {
     let mut data: Vec<u8> = Vec::with_capacity(1 + auth.len());
     data.push(0x01); // packet id: CONFIG_REQ
     data.extend_from_slice(auth);
@@ -96,19 +95,19 @@ pub async fn obtain_config(conv: &mut Conversation<'_>) -> Result<WgAddrConfig, 
     let result = timeout(Duration::from_secs(1), conv.socket.read(&mut buf)).await;
 
     if let Err(_) = result {
-        Err("timed out waiting for response from remote")?;
+        Err("Timed out waiting for response from remote")?;
     }
 
     let size = result.unwrap()?;
 
     if size == 0 {
-        Err("invalid credentials")?;
+        Err(format!("Permission denied ({})", conv.auth_method.unwrap().name()))?;
     }
 
     let buf = &mut buf[..size];
     let is_encrypted = magic::parse(buf[0]).ok_or("invalid magic")?;
     if !is_encrypted {
-        Err("received unencrypted response")?;
+        Err("Received unencrypted response")?;
     }
 
     let buf = &mut buf[1..]; // strip magic
