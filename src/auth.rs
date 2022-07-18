@@ -1,7 +1,7 @@
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AuthMethod {
     Open = 0,
     Password = 1,
@@ -67,7 +67,7 @@ pub struct InvalidMethodError;
 
 impl fmt::Display for InvalidMethodError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "valid values: open, passphrase, username+password")
+        write!(f, "valid values: open, password, username+password")
     }
 }
 

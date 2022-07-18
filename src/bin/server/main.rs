@@ -8,6 +8,7 @@ use dynamic_wireguard::{auth::AuthMethod, conv, logger};
 use futures::{select, FutureExt};
 use interface::delete_interface;
 use ipnetwork::Ipv4Network;
+use log::warn;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 
@@ -18,9 +19,9 @@ pub mod config;
 pub mod fingerprint;
 pub mod interface;
 pub mod key;
+pub mod leasing;
 pub mod net;
 pub mod verifyauth;
-pub mod leasing;
 
 use crate::config::ServerConfig;
 use crate::fingerprint::print_fingerprint;
@@ -35,7 +36,7 @@ struct Cli {
     #[clap(
         short = 'b',
         long = "bind",
-        value_name = "IP:PORT",
+        value_name = "ip:port",
         help = "Bind to this TCP address, default: 0.0.0.0:7575"
     )]
     bind: Option<SocketAddr>,
@@ -43,7 +44,7 @@ struct Cli {
     #[clap(
         short = 'k',
         long = "key",
-        value_name = "PATH",
+        value_name = "path",
         help = "Read X25519 private key from this file"
     )]
     key_file: String,
@@ -51,7 +52,7 @@ struct Cli {
     #[clap(
         short = 'i',
         long = "iface",
-        value_name = "INTERFACE",
+        value_name = "name",
         help = "WireGuard interface to use/create, default: wgd0s"
     )]
     if_name: Option<String>,
@@ -59,23 +60,23 @@ struct Cli {
     #[clap(
         short = 's',
         long = "subnet",
-        value_name = "IPv4/CIDR",
-        help = "Internal subnet used to assign IPs to clients, default: 10.0.0.0/24"
+        value_name = "ipv4/prefix",
+        help = "Internal subnet used to assign IPs to clients, default: 10.100.0.0/24"
     )]
     subnet: Option<Ipv4Network>,
 
     #[clap(
         short = 'g',
         long = "gateway",
-        value_name = "IPv4",
-        help = "Internal IP of the server on the VPN subnet, default: 10.0.0.1"
+        value_name = "ipv4",
+        help = "Internal IP of the server on the VPN subnet, default: 10.100.0.1"
     )]
     gateway: Option<Ipv4Addr>,
 
     #[clap(
         short = 'p',
         long = "wg-port",
-        value_name = "PORT",
+        value_name = "port",
         help = "Port that WireGuard should listen on (0-65535) default: 51820"
     )]
     wg_port: Option<u16>,
@@ -83,8 +84,8 @@ struct Cli {
     #[clap(
         short = 'a',
         long = "auth",
-        value_name = "AUTH METHOD",
-        help = "Authentication method for clients"
+        value_name = "method",
+        help = "Authentication method for clients (open|password|username+password), default: open"
     )]
     auth: Option<AuthMethod>,
 }
@@ -121,6 +122,12 @@ async fn main() {
             "gateway address {} is outside of internal subnet {} (use -s or -g to change)",
             conf.gateway, conf.subnet
         );
+    }
+
+    if conf.auth_method == AuthMethod::Open {
+        warn!("auth method is set to open; anyone may connect to this server (change with -a)");
+    } else {
+        info!("authenticating clients with {}", conf.auth_method);
     }
 
     if let Err(e) = create_server_interface(&conf).await {
