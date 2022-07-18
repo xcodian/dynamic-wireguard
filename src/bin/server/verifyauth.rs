@@ -5,7 +5,7 @@ pub fn verify(attempt: &[u8], conv: &Conversation) -> bool {
 
     let verdict = match method {
         AuthMethod::Open => true,
-        AuthMethod::Passphrase => {
+        AuthMethod::Password => {
             let hash = std::str::from_utf8(attempt);
             if hash.is_err() {
                 return false;

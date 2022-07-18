@@ -9,7 +9,7 @@ use dynamic_wireguard::crypto::hash_hash;
 pub fn get_auth<'a>(method: &AuthMethod) -> Result<Vec<u8>, Box<dyn Error>> {
     match method {
         AuthMethod::Open => Ok(vec![]),
-        AuthMethod::Passphrase => Ok(get_passphrase()?.as_bytes().to_vec()),
+        AuthMethod::Password => Ok(get_passphrase()?.as_bytes().to_vec()),
         AuthMethod::UsernamePassword => Ok(get_username_password()?.as_bytes().to_vec()),
         // _ => Err(MethodNotSupportedError)?,
     }

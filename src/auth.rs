@@ -4,7 +4,7 @@ use std::str::FromStr;
 #[derive(Debug, Copy, Clone)]
 pub enum AuthMethod {
     Open = 0,
-    Passphrase = 1,
+    Password = 1,
     UsernamePassword = 2,
 }
 
@@ -12,7 +12,7 @@ impl AuthMethod {
     pub fn from_u8(val: u8) -> Result<AuthMethod, MethodNotSupportedError> {
         match val {
             0 => Ok(AuthMethod::Open),
-            1 => Ok(AuthMethod::Passphrase),
+            1 => Ok(AuthMethod::Password),
             2 => Ok(AuthMethod::UsernamePassword),
             _ => Err(MethodNotSupportedError),
         }
@@ -25,7 +25,7 @@ impl AuthMethod {
     pub fn name(&self) -> &'static str {
         match self {
             AuthMethod::Open => "open",
-            AuthMethod::Passphrase => "passphrase",
+            AuthMethod::Password => "password",
             AuthMethod::UsernamePassword => "username+password",
         }
     }
@@ -43,7 +43,7 @@ impl FromStr for AuthMethod {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "open" => Ok(AuthMethod::Open),
-            "passphrase" => Ok(AuthMethod::Passphrase),
+            "password" => Ok(AuthMethod::Password),
             "username+password" => Ok(AuthMethod::UsernamePassword),
             _ => Err(InvalidMethodError)
         }
