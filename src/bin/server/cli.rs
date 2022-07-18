@@ -9,15 +9,15 @@ use ipnetwork::Ipv4Network;
 #[clap(name = "dynamic-wireguard server")]
 pub struct Cli {
     #[clap(
-        short = 'b',
-        long = "bind",
+        short,
+        long,
         value_name = "ip:port",
         help = "Bind to this TCP address, default: 0.0.0.0:7575"
     )]
     pub bind: Option<SocketAddr>,
 
     #[clap(
-        short = 'k',
+        short,
         long = "key",
         value_name = "path",
         help = "Read X25519 private key from this file"
@@ -25,7 +25,7 @@ pub struct Cli {
     pub key_file: String,
 
     #[clap(
-        short = 'i',
+        short,
         long = "iface",
         value_name = "name",
         help = "WireGuard interface to use/create, default: wgd0s"
@@ -33,8 +33,8 @@ pub struct Cli {
     pub if_name: Option<String>,
 
     #[clap(
-        short = 's',
-        long = "subnet",
+        short,
+        long,
         value_name = "ipv4/prefix",
         help = "Internal subnet used to assign IPs to clients, default: 10.100.0.0/24"
     )]
@@ -57,8 +57,8 @@ pub struct Cli {
     pub wg_port: Option<u16>,
 
     #[clap(
-        short = 'a',
-        long = "auth",
+        short,
+        long,
         value_name = "method",
         help = "Authentication method for clients (open|password|username+password), default: open"
     )]
@@ -68,5 +68,5 @@ pub struct Cli {
         long = "genkey",
         help = "Generate an X25519 key into the key file if it doesn't exist"
     )]
-    pub gen_key: bool
+    pub gen_key: bool,
 }
