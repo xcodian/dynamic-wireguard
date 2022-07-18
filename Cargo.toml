@@ -38,6 +38,10 @@ netlink-packet-core = "0.4.2"
 netlink-packet-generic = "0.3.1"
 netlink-packet-wireguard = "0.2.1"
 
+clap = { version = "3.2.12", features = ["derive"] }
+ipnetwork = "0.20.0"
+base64 = "0.13.0"
+
 [profile.release]
 opt-level = 'z'     # Optimize for size.
 lto = true          # Enable Link Time Optimization

@@ -1,14 +1,11 @@
 use std::error::Error;
 use std::io::IoSlice;
-use std::net::Ipv4Addr;
-use std::str::FromStr;
 
-use dynamic_wireguard::auth::AuthMethod;
 use dynamic_wireguard::conv::Conversation;
 use dynamic_wireguard::wgconfig::WgAddrConfig;
 use dynamic_wireguard::{crypto, magic};
 
-use log::{debug, warn, info};
+use log::{warn, info};
 use rand::rngs::OsRng;
 use rand::RngCore;
 use tokio::io::AsyncWriteExt;
@@ -16,6 +13,7 @@ use x25519_dalek::PublicKey;
 
 use crate::config::ServerConfig;
 use crate::interface::add_peer_to_interface;
+use crate::leasing::get_free_address;
 use crate::verifyauth::verify;
 
 pub async fn process_packet(
@@ -31,7 +29,7 @@ pub async fn process_packet(
 
     if !is_encrypted {
         // this packet must be a key + counter request (handshake)
-        let res = keyex_reply(conv, encrypted).await;
+        let res = keyex_reply(conv, conf, encrypted).await;
 
         return match res {
             Ok(_) => Ok(()),
@@ -55,7 +53,7 @@ pub async fn process_packet(
             // config request
             1 => {
                 info!("client requested config");
-                let remote_config = config_reply(conv, msg).await?;
+                let remote_config = config_reply(conv, conf, msg).await?;
 
                 // make local interface
                 add_peer_to_interface(&conf, remote_config.assigned_address, &conv.remote_public_key.unwrap()).await?;
@@ -69,7 +67,7 @@ pub async fn process_packet(
     return Ok(());
 }
 
-pub async fn keyex_reply(conv: &mut Conversation<'_>, msg: &mut [u8]) -> Result<(), Box<dyn Error>> {
+pub async fn keyex_reply(conv: &mut Conversation<'_>, conf: &ServerConfig, msg: &mut [u8]) -> Result<(), Box<dyn Error>> {
     if let Some(_) = conv.counter {
         // counter is already initialized but this is a key request??
         // drop the connection
@@ -98,7 +96,9 @@ pub async fn keyex_reply(conv: &mut Conversation<'_>, msg: &mut [u8]) -> Result<
     // compute public key
     let server_public_key = PublicKey::from(conv.local_private_key);
 
-    conv.auth_method = Some(AuthMethod::UsernamePassword);
+    // get appropriate auth method
+    // for now just use the set one from the cli
+    conv.auth_method = Some(conf.auth_method); // TODO: add more flexible auth method decisions based on who is connecting
 
     // send public key & counter initializer to the client
     info!("keyex: sending handshake reply");
@@ -114,17 +114,17 @@ pub async fn keyex_reply(conv: &mut Conversation<'_>, msg: &mut [u8]) -> Result<
     return Ok(());
 }
 
-pub async fn config_reply(conv: &mut Conversation<'_>, msg: &[u8]) -> Result<WgAddrConfig, Box<dyn Error>> {
+pub async fn config_reply(conv: &mut Conversation<'_>, conf: &ServerConfig, msg: &[u8]) -> Result<WgAddrConfig, Box<dyn Error>> {
     // verify authentication method
     if !verify(msg, conv) {
-        Err(format!("authentication failed ({})", conv.auth_method.unwrap().name()))?;
+        Err(format!("authentication failed ({})", conv.auth_method.unwrap()))?;
     }
 
     // make config
     let config = WgAddrConfig {
-        wg_endpoint_port: 4000u16,
-        internal_gateway: Ipv4Addr::from_str("10.8.0.1").unwrap(),
-        assigned_address: Ipv4Addr::from_str("10.8.0.69").unwrap(),
+        wg_endpoint_port: conf.wg_port,
+        internal_gateway: conf.gateway,
+        assigned_address: get_free_address(&conf)?,
     };
 
     // pack into bytes & encrypt

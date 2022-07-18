@@ -1,5 +1,5 @@
 use dynamic_wireguard::{conv, logger};
-use log::{debug, error, info};
+use log::{debug, error};
 use rand::rngs::OsRng;
 use tokio::net::TcpStream;
 

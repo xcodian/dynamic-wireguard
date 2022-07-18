@@ -101,7 +101,7 @@ pub async fn obtain_config(conv: &mut Conversation<'_>, auth: &[u8]) -> Result<W
     let size = result.unwrap()?;
 
     if size == 0 {
-        Err(format!("Permission denied ({})", conv.auth_method.unwrap().name()))?;
+        Err(format!("Permission denied ({})", conv.auth_method.unwrap()))?;
     }
 
     let buf = &mut buf[..size];

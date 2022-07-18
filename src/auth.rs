@@ -1,6 +1,7 @@
 use std::fmt;
+use std::str::FromStr;
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum AuthMethod {
     Open = 0,
     Passphrase = 1,
@@ -36,6 +37,19 @@ impl fmt::Display for AuthMethod {
     }
 }
 
+impl FromStr for AuthMethod {
+    type Err = InvalidMethodError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "open" => Ok(AuthMethod::Open),
+            "passphrase" => Ok(AuthMethod::Passphrase),
+            "username+password" => Ok(AuthMethod::UsernamePassword),
+            _ => Err(InvalidMethodError)
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct MethodNotSupportedError;
 
@@ -46,3 +60,15 @@ impl fmt::Display for MethodNotSupportedError {
 }
 
 impl std::error::Error for MethodNotSupportedError {}
+
+
+#[derive(Debug, Clone)]
+pub struct InvalidMethodError;
+
+impl fmt::Display for InvalidMethodError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "valid values: open, passphrase, username+password")
+    }
+}
+
+impl std::error::Error for InvalidMethodError {}

@@ -1,5 +1,6 @@
 use std::net::Ipv4Addr;
 
+use dynamic_wireguard::auth::AuthMethod;
 use x25519_dalek::{StaticSecret, PublicKey};
 
 pub struct ServerConfig {
@@ -9,7 +10,8 @@ pub struct ServerConfig {
     pub if_name: String,
     
     pub gateway: Ipv4Addr,
-    pub cidr: u8,
+    pub subnet: ipnetwork::Ipv4Network,
+    pub wg_port: u16,
 
-    pub wg_port: u16
+    pub auth_method: AuthMethod
 }

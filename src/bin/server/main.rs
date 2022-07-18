@@ -1,46 +1,127 @@
 use std::net::Ipv4Addr;
-use std::str::FromStr;
+use std::net::SocketAddr;
 use std::sync::Arc;
 
-use dynamic_wireguard::{conv, logger};
+use clap::Parser;
+use dynamic_wireguard::{auth::AuthMethod, conv, logger};
 
 use futures::{select, FutureExt};
 use interface::delete_interface;
-use rand::rngs::OsRng;
+use ipnetwork::Ipv4Network;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
 
 use tokio::signal::ctrl_c;
-use x25519_dalek::{PublicKey, StaticSecret};
+use x25519_dalek::PublicKey;
 
 pub mod config;
 pub mod fingerprint;
 pub mod interface;
+pub mod key;
 pub mod net;
 pub mod verifyauth;
+pub mod leasing;
 
 use crate::config::ServerConfig;
 use crate::fingerprint::print_fingerprint;
 use crate::interface::create_server_interface;
+use crate::key::get_key;
 
-use log::{info, error, debug};
+use log::{error, info};
 
+#[derive(Debug, Parser)]
+#[clap(name = "dynamic-wireguard server")]
+struct Cli {
+    #[clap(
+        short = 'b',
+        long = "bind",
+        value_name = "IP:PORT",
+        help = "Bind to this TCP address, default: 0.0.0.0:7575"
+    )]
+    bind: Option<SocketAddr>,
+
+    #[clap(
+        short = 'k',
+        long = "key",
+        value_name = "PATH",
+        help = "Read X25519 private key from this file"
+    )]
+    key_file: String,
+
+    #[clap(
+        short = 'i',
+        long = "iface",
+        value_name = "INTERFACE",
+        help = "WireGuard interface to use/create, default: wgd0s"
+    )]
+    if_name: Option<String>,
+
+    #[clap(
+        short = 's',
+        long = "subnet",
+        value_name = "IPv4/CIDR",
+        help = "Internal subnet used to assign IPs to clients, default: 10.0.0.0/24"
+    )]
+    subnet: Option<Ipv4Network>,
+
+    #[clap(
+        short = 'g',
+        long = "gateway",
+        value_name = "IPv4",
+        help = "Internal IP of the server on the VPN subnet, default: 10.0.0.1"
+    )]
+    gateway: Option<Ipv4Addr>,
+
+    #[clap(
+        short = 'p',
+        long = "wg-port",
+        value_name = "PORT",
+        help = "Port that WireGuard should listen on (0-65535) default: 51820"
+    )]
+    wg_port: Option<u16>,
+
+    #[clap(
+        short = 'a',
+        long = "auth",
+        value_name = "AUTH METHOD",
+        help = "Authentication method for clients"
+    )]
+    auth: Option<AuthMethod>,
+}
 #[tokio::main]
 async fn main() {
     logger::init().unwrap();
 
-    // generate private key
-    let private_key = StaticSecret::new(&mut OsRng);
+    let cli = Cli::parse();
+
+    // get a private key
+    let private_key = match get_key(&cli.key_file) {
+        Ok(k) => k,
+        Err(e) => return error!("read private key: {}", e),
+    };
+
+    let subnet = cli.subnet.unwrap_or("10.100.0.0/24".parse().unwrap());
 
     // create server config in an Arc to share it with the workers
     let conf = Arc::new(ServerConfig {
-        if_name: "wgd0".to_string(),
+        if_name: cli.if_name.unwrap_or("wgd0s".to_string()),
         public_key: PublicKey::from(&private_key),
         private_key: private_key,
-        gateway: Ipv4Addr::from_str("10.8.0.1").unwrap(),
-        wg_port: 4000,
-        cidr: 24,
+        gateway: cli
+            .gateway
+            // try to get a .1 address or if you must .0
+            .unwrap_or(subnet.nth(1).unwrap_or(subnet.nth(0).unwrap())),
+        subnet: subnet,
+        wg_port: cli.wg_port.unwrap_or(51820),
+        auth_method: cli.auth.unwrap_or(AuthMethod::Open),
     });
+
+    if !conf.subnet.contains(conf.gateway) {
+        return error!(
+            "gateway address {} is outside of internal subnet {} (use -s or -g to change)",
+            conf.gateway, conf.subnet
+        );
+    }
 
     if let Err(e) = create_server_interface(&conf).await {
         return error!("{}", e);
@@ -50,12 +131,13 @@ async fn main() {
     print_fingerprint(&conf.public_key.to_bytes());
 
     // bind a tcp listener
-    let listener = match TcpListener::bind("0.0.0.0:8000").await {
-        Ok(listener) => listener,
-        Err(e) => {
-            return error!("{}", e);
-        }
-    };
+    let listener =
+        match TcpListener::bind(cli.bind.unwrap_or("0.0.0.0:7575".parse().unwrap())).await {
+            Ok(listener) => listener,
+            Err(e) => {
+                return error!("{}", e);
+            }
+        };
 
     info!("listening for connections...");
 
@@ -113,6 +195,7 @@ async fn main() {
                         }
                     }
 
+                    // FIXME: this is stupid
                     info!("connection closed: {}", match conv.socket.peer_addr() { Ok(addr) => addr.to_string(), Err(_) => "no address (disconnected)".to_string() });
                 };
 

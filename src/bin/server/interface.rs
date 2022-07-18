@@ -98,10 +98,10 @@ pub async fn create_server_interface(conf: &ServerConfig) -> Result<(), Box<dyn 
         let link = get_res.unwrap();
 
         // 3. add its address
-        debug!("assign address: {}/{}", conf.gateway, conf.cidr);
+        debug!("assign address: {}/{}", conf.gateway, conf.subnet.prefix());
         let addr_add_res = rt_handle
             .address()
-            .add(link.header.index, IpAddr::V4(conf.gateway), conf.cidr)
+            .add(link.header.index, IpAddr::V4(conf.gateway), conf.subnet.prefix())
             .execute()
             .await;
 
@@ -114,7 +114,7 @@ pub async fn create_server_interface(conf: &ServerConfig) -> Result<(), Box<dyn 
         let mtu_res = rt_handle
             .link()
             .set(link.header.index)
-            .mtu(1420)
+            .mtu(1420) // TODO: do not hard code MTU maybe
             .execute()
             .await;
 
@@ -168,6 +168,8 @@ pub async fn add_peer_to_interface(
             WgDeviceAttrs::Peers(vec![WgPeer(vec![
                 WgPeerAttrs::PublicKey(remote_public.to_bytes()),
                 WgPeerAttrs::AllowedIps(vec![WgAllowedIp(vec![
+                    // TODO: make this more flexible, what if the client wants to
+                    // proxy ALL traffic?
                     WgAllowedIpAttrs::IpAddr(IpAddr::V4(ip)),
                     WgAllowedIpAttrs::Cidr(32),
                     WgAllowedIpAttrs::Family(2),
