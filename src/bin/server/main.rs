@@ -1,13 +1,9 @@
-use std::net::Ipv4Addr;
-use std::net::SocketAddr;
 use std::sync::Arc;
-
 use clap::Parser;
 use dynamic_wireguard::{auth::AuthMethod, conv, logger};
 
 use futures::{select, FutureExt};
 use interface::delete_interface;
-use ipnetwork::Ipv4Network;
 use log::warn;
 use tokio::io::AsyncReadExt;
 use tokio::net::TcpListener;
@@ -22,7 +18,9 @@ pub mod key;
 pub mod leasing;
 pub mod net;
 pub mod verifyauth;
+pub mod cli;
 
+use crate::cli::Cli;
 use crate::config::ServerConfig;
 use crate::fingerprint::print_fingerprint;
 use crate::interface::create_server_interface;
@@ -30,71 +28,6 @@ use crate::key::get_key;
 
 use log::{error, info};
 
-#[derive(Debug, Parser)]
-#[clap(name = "dynamic-wireguard server")]
-struct Cli {
-    #[clap(
-        short = 'b',
-        long = "bind",
-        value_name = "ip:port",
-        help = "Bind to this TCP address, default: 0.0.0.0:7575"
-    )]
-    bind: Option<SocketAddr>,
-
-    #[clap(
-        short = 'k',
-        long = "key",
-        value_name = "path",
-        help = "Read X25519 private key from this file"
-    )]
-    key_file: String,
-
-    #[clap(
-        short = 'i',
-        long = "iface",
-        value_name = "name",
-        help = "WireGuard interface to use/create, default: wgd0s"
-    )]
-    if_name: Option<String>,
-
-    #[clap(
-        short = 's',
-        long = "subnet",
-        value_name = "ipv4/prefix",
-        help = "Internal subnet used to assign IPs to clients, default: 10.100.0.0/24"
-    )]
-    subnet: Option<Ipv4Network>,
-
-    #[clap(
-        short = 'g',
-        long = "gateway",
-        value_name = "ipv4",
-        help = "Internal IP of the server on the VPN subnet, default: 10.100.0.1"
-    )]
-    gateway: Option<Ipv4Addr>,
-
-    #[clap(
-        short = 'p',
-        long = "wg-port",
-        value_name = "port",
-        help = "Port that WireGuard should listen on (0-65535) default: 51820"
-    )]
-    wg_port: Option<u16>,
-
-    #[clap(
-        short = 'a',
-        long = "auth",
-        value_name = "method",
-        help = "Authentication method for clients (open|password|username+password), default: open"
-    )]
-    auth: Option<AuthMethod>,
-
-    #[clap(
-        long = "genkey",
-        help = "Generate an X25519 key into the key file if it doesn't exist"
-    )]
-    gen_key: bool
-}
 #[tokio::main]
 async fn main() {
     logger::init().unwrap();
