@@ -88,6 +88,12 @@ struct Cli {
         help = "Authentication method for clients (open|password|username+password), default: open"
     )]
     auth: Option<AuthMethod>,
+
+    #[clap(
+        long = "genkey",
+        help = "Generate an X25519 key into the key file if it doesn't exist"
+    )]
+    gen_key: bool
 }
 #[tokio::main]
 async fn main() {
@@ -96,7 +102,7 @@ async fn main() {
     let cli = Cli::parse();
 
     // get a private key
-    let private_key = match get_key(&cli.key_file) {
+    let private_key = match get_key(&cli.key_file, cli.gen_key) {
         Ok(k) => k,
         Err(e) => return error!("read private key: {}", e),
     };
