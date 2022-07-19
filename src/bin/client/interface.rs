@@ -21,13 +21,12 @@ use netlink_packet_generic::GenlMessage;
 use futures::stream::TryStreamExt;
 
 pub async fn create_interface(
+    if_name: &String,
     config: &WgAddrConfig,
     local_private: &StaticSecret,
     remote_public: &PublicKey,
     remote_addr: Ipv4Addr,
 ) {
-    // let if_name = "wgdyn0".to_string();
-
     // open RTNETLINK connection
     let rt_maybe = rtnetlink::new_connection();
 
@@ -57,8 +56,6 @@ pub async fn create_interface(
 
     //     if_num += 1;
     // }
-
-    let if_name = "wgdyn0".to_string();
 
     // generate request
     let mut add_req = rt_handle.link().add();

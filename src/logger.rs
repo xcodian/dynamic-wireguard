@@ -13,14 +13,14 @@ impl log::Log for SimpleLogger {
     fn log(&self, record: &Record) {
         if self.enabled(record.metadata()) {
             let prefix = match record.level() {
-                Level::Error => "error:".bright_red(),
-                Level::Warn => "warn:".bright_yellow(),
-                Level::Info => "info:".bright_blue(),
-                Level::Debug => "debug:".bright_cyan(),
-                Level::Trace => "trace:".bright_magenta(),
-            }.bold();
+                Level::Error => "error: ".bright_red().bold(),
+                Level::Warn => "warn: ".bright_yellow().bold(),
+                Level::Info => "".into(),
+                Level::Debug => "debug: ".bright_cyan().bold(),
+                Level::Trace => "trace: ".bright_magenta().bold(),
+            };
 
-            println!("{} {}", prefix, record.args());
+            println!("{}{}", prefix, record.args());
         }
     }
 

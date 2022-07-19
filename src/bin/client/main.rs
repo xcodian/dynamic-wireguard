@@ -1,12 +1,15 @@
+use clap::Parser;
+use cli::ComplexHost;
 use dynamic_wireguard::{conv, logger};
-use log::{debug, error};
+use log::{error, info};
 use rand::rngs::OsRng;
 use tokio::net::TcpStream;
 
 use x25519_dalek::StaticSecret;
 
-use crate::fingerprint::verify_fingerprint;
+use crate::{cli::Cli, fingerprint::verify_fingerprint};
 
+pub mod cli;
 pub mod fingerprint;
 pub mod getauth;
 pub mod interface;
@@ -16,12 +19,21 @@ pub mod net;
 async fn main() {
     logger::init().unwrap();
 
-    debug!("connecting...");
-    let target = std::env::args()
-        .nth(1)
-        .unwrap_or_else(|| "127.0.0.1:8000".to_string());
+    let cli = Cli::parse();
 
-    let socket = TcpStream::connect(target).await;
+    match cli.command {
+        cli::Commands::Connect { host, interface } => {
+            // todo: make this increment the number
+            connect(host, interface.unwrap_or(String::from("wgdyn0"))).await;
+        }
+        cli::Commands::Disconnect { host } => todo!(),
+        cli::Commands::Prune { host, interface } => todo!(),
+    };
+}
+
+async fn connect(host: ComplexHost, if_name: String) {
+    info!("Connecting to {}...", host.exact);
+    let socket = TcpStream::connect(host.addrs.as_slice()).await;
 
     if let Err(ref e) = socket {
         error!("failed to connect: {}", e);
@@ -47,11 +59,8 @@ async fn main() {
         auth_method: None,
     };
 
-    let res = net::key_exchange(&mut conv).await;
-
-    if let Err(e) = res {
-        error!("{}", e);
-        return;
+    if let Err(e) = net::key_exchange(&mut conv).await {
+        return error!("{}", e);
     }
 
     if !verify_fingerprint(
@@ -63,27 +72,20 @@ async fn main() {
         return;
     }
 
-    let credential = getauth::get_auth(&conv.auth_method.unwrap());
-
-    if let Err(e) = credential {
-        error!("{}", e);
-        return;
-    }
-
-    let credential = credential.unwrap();
+    let credential = match getauth::get_auth(&conv.auth_method.unwrap()) {
+        Ok(c) => c,
+        Err(e) => return error!("{}", e),
+    };
 
     // obtain configuration
-    let config = net::obtain_config(&mut conv, credential.as_slice()).await;
-
-    if let Err(e) = config {
-        error!("{}", e);
-        return;
-    }
-
-    let config = config.unwrap();
+    let addr_config = match net::obtain_config(&mut conv, credential.as_slice()).await {
+        Ok(c) => c,
+        Err(e) => return error!("{}", e),
+    };
 
     interface::create_interface(
-        &config,
+        &if_name,
+        &addr_config,
         &client_private_key,
         &conv.remote_public_key.unwrap(),
         remote_ip,
