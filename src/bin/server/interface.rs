@@ -1,9 +1,8 @@
 use std::error::Error;
 use std::net::{IpAddr, Ipv4Addr};
 
-
-
 use log::{debug, info};
+use netlink_packet_wireguard::constants::{WGPEER_F_REMOVE_ME, WGPEER_F_UPDATE_ONLY};
 use netlink_packet_wireguard::nlas::{
     WgAllowedIp, WgAllowedIpAttrs, WgDeviceAttrs, WgPeer, WgPeerAttrs,
 };
@@ -101,7 +100,11 @@ pub async fn create_server_interface(conf: &ServerConfig) -> Result<(), Box<dyn 
         debug!("assign address: {}/{}", conf.gateway, conf.subnet.prefix());
         let addr_add_res = rt_handle
             .address()
-            .add(link.header.index, IpAddr::V4(conf.gateway), conf.subnet.prefix())
+            .add(
+                link.header.index,
+                IpAddr::V4(conf.gateway),
+                conf.subnet.prefix(),
+            )
             .execute()
             .await;
 
@@ -174,6 +177,7 @@ pub async fn add_peer_to_interface(
                     WgAllowedIpAttrs::Cidr(32),
                     WgAllowedIpAttrs::Family(2),
                 ])]),
+                WgPeerAttrs::Flags(WGPEER_F_UPDATE_ONLY),
             ])]),
         ],
     });
@@ -184,6 +188,39 @@ pub async fn add_peer_to_interface(
     nl_handle.notify(nl_msg).await?;
 
     info!("added peer to interface: assigned {}", ip);
+
+    return Ok(());
+}
+
+pub async fn remove_peer_from_interface(
+    conf: &ServerConfig,
+    remote_public: &PublicKey,
+) -> Result<(), Box<dyn Error>> {
+    let mut nl_handle = connect_to_genetlink().await?;
+
+    // generate "set device" request
+    let genl_msg: GenlMessage<Wireguard> = GenlMessage::from_payload(Wireguard {
+        cmd: WireguardCmd::SetDevice,
+        nlas: vec![
+            // by interface name
+            WgDeviceAttrs::IfName(conf.if_name.clone()),
+            // add peer
+            WgDeviceAttrs::Peers(vec![WgPeer(vec![
+                WgPeerAttrs::PublicKey(remote_public.to_bytes()),
+                WgPeerAttrs::Flags(WGPEER_F_REMOVE_ME),
+            ])]),
+        ],
+    });
+
+    // send netlink message to kernel to configure wireguard
+    let mut nl_msg = NetlinkMessage::from(genl_msg);
+    nl_msg.header.flags = NLM_F_REQUEST;
+    nl_handle.notify(nl_msg).await?;
+
+    info!(
+        "removed peer from interface: {}",
+        hex::encode(remote_public.as_bytes())
+    );
 
     return Ok(());
 }
