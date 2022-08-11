@@ -26,4 +26,4 @@ This is where Dynamic Wireguard can help you. It allows:
 (todo)
 
 ## How To Use It
-(todo)
+Don't. Not yet at least. Soon™.
