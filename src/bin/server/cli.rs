@@ -28,7 +28,7 @@ pub struct Cli {
         short,
         long = "iface",
         value_name = "name",
-        help = "WireGuard interface to use/create, default: wgd0s"
+        help = "WireGuard interface to use/create, default: wgdyn0s"
     )]
     pub if_name: Option<String>,
 

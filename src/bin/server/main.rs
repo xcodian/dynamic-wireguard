@@ -1,6 +1,6 @@
-use std::sync::Arc;
 use clap::Parser;
 use dynamic_wireguard::{auth::AuthMethod, conv, logger};
+use std::sync::Arc;
 
 use futures::{select, FutureExt};
 use interface::delete_interface;
@@ -11,6 +11,7 @@ use tokio::net::TcpListener;
 use tokio::signal::ctrl_c;
 use x25519_dalek::PublicKey;
 
+pub mod cli;
 pub mod config;
 pub mod fingerprint;
 pub mod interface;
@@ -18,7 +19,6 @@ pub mod key;
 pub mod leasing;
 pub mod net;
 pub mod verifyauth;
-pub mod cli;
 
 use crate::cli::Cli;
 use crate::config::ServerConfig;
@@ -44,7 +44,7 @@ async fn main() {
 
     // create server config in an Arc to share it with the workers
     let conf = Arc::new(ServerConfig {
-        if_name: cli.if_name.unwrap_or("wgd0s".to_string()),
+        if_name: cli.if_name.unwrap_or("wgdyn0s".to_string()),
         public_key: PublicKey::from(&private_key),
         private_key: private_key,
         gateway: cli
