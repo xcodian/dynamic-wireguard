@@ -2,6 +2,9 @@
 Make WireGuard connections with servers without any pre-configuration. You can use this as a general-purpose VPN connection
 system, using something like a username & password to connect. No static addressing required!
 
+## ⚠️ WIP - CURRENTLY UNFINISHED ⚠️
+- Right now dynamic-wireguard is missing implementation of key features, and is half-finished. It's in an unusable state, don't use it. I'm serious, [the authentication is hard coded right now](src/bin/client/../server/verifyauth.rs) (look at line 36). This repository is public so others may track progess towards its completion. This is being worked on by me, albeit slowly due to other factors in my life.
+
 ## Motive
 WireGuard is inflexible.
 - It uses static IP addresses everywhere
@@ -24,15 +27,3 @@ This is where Dynamic Wireguard can help you. It allows:
 
 ## How To Use It
 (todo)
-
-On the server:
-```bash
-$ dynwg-server -c server.conf
-```
-
-On the client:
-```bash
-$ dynwg join wg.example.net
-Connecting to wg.example.net...
-You are now connected!
-```
